@@ -13,79 +13,88 @@ body {
   padding: 10px;
   background: #f5f5f5;
 }
+
+#res {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  margin: 0 auto 10px;
+  padding: 16px;
+  color: white;
+  font-size: 22px;
+  font-weight: bold;
+  display: none;
+  width: 95%;
+  max-width: 420px;
+  border-radius: 12px;
+}
+
+.ok { background: #188038; }
+.repetido { background: #d93025; }
+.no { background: #f29900; }
+.error { background: #666; }
+
+.detalle {
+  font-size: 17px;
+  margin-top: 6px;
+}
+
 #reader {
   width: 100%;
-  max-width: 400px;
-  margin: auto;
+  max-width: 260px;
+  margin: 10px auto;
 }
+
 .fila {
   display: flex;
   gap: 8px;
   justify-content: center;
   margin-top: 12px;
 }
+
 input {
   width: 65%;
+  max-width: 220px;
   font-size: 20px;
   padding: 10px;
 }
+
 button {
   font-size: 20px;
   padding: 10px 14px;
 }
-#res {
-  margin: 15px auto 0;
-  padding: 20px;
-  color: white;
-  font-size: 22px;
-  font-weight: bold;
-  display: none;
-  max-width: 400px;
-  border-radius: 12px;
-}
-.ok { background: green; }
-.repetido { background: red; }
-.no { background: orange; }
-.error { background: #666; }
-.detalle {
-  font-size: 17px;
-  font-weight: normal;
+
+#debug {
   margin-top: 8px;
-  line-height: 1.3;
+  font-size: 13px;
+  color: #444;
 }
 </style>
 </head>
 
 <body>
 
+<div id="res"></div>
+
 <div id="reader"></div>
+
+<div id="debug">Esperando QR...</div>
 
 <div class="fila">
   <input id="dni" placeholder="DNI">
   <button onclick="manual()">OK</button>
 </div>
 
-<div id="res"></div>
-
 <script>
-const API = "https://script.googleusercontent.com/macros/echo?user_content_key=AWDtjMWj4snQTpjS7dVdb_8WhBqrRYsr0pQXTqL_CM3hQfYoZY34x0sQlavaxl-_2HPn1ULsgqPtz-Wb1c0lBZb7NZcWBRuDJanxmKzmSwTfOaoct0Xd2RSOfVlHYcfFuQ9nA1FNm8UTcTcucPN_ACi-ZgsUEvn8woKp0-JNW6NljyNAsSN3HHn8UX62wmio5t7li8xmiEE0a4HHPqHdKt3W2GTY2FSwraFD-wmTL4RL4MxrJOR1bAsMO-ydn4bx6scG4GvVCXmQPpHnYEn-iEndX9hFMkmmPb62SQAtb_s0yx6KgBVm4sUXrTio5LaTTw&lib=MtJ3sSf_SeA7FFvmlMplDGdvxmZOJkMC1&formato=json";let bloqueado = false;
+const API = "https://script.googleusercontent.com/macros/echo?user_content_key=AWDtjMWj4snQTpjS7dVdb_8WhBqrRYsr0pQXTqL_CM3hQfYoZY34x0sQlavaxl-_2HPn1ULsgqPtz-Wb1c0lBZb7NZcWBRuDJanxmKzmSwTfOaoct0Xd2RSOfVlHYcfFuQ9nA1FNm8UTcTcucPN_ACi-ZgsUEvn8woKp0-JNW6NljyNAsSN3HHn8UX62wmio5t7li8xmiEE0a4HHPqHdKt3W2GTY2FSwraFD-wmTL4RL4MxrJOR1bAsMO-ydn4bx6scG4GvVCXmQPpHnYEn-iEndX9hFMkmmPb62SQAtb_s0yx6KgBVm4sUXrTio5LaTTw&lib=MtJ3sSf_SeA7FFvmlMplDGdvxmZOJkMC1&formato=json";
+
+let bloqueado = false;
 let ultimoCodigo = "";
 let ultimoTiempo = 0;
+let contador = 0;
 
-function extraerDni(valor) {
-  const texto = (valor || "").trim();
-
-  // Si el QR trae link completo con ?dni=
-  try {
-    const url = new URL(texto);
-    const dniUrl = url.searchParams.get("dni");
-    if (dniUrl) return dniUrl.trim();
-  } catch (e) {
-    // No era URL, seguimos
-  }
-
-  // Si el QR trae solo DNI
-  return texto;
+function debug(txt){
+  document.getElementById("debug").textContent = txt;
 }
 
 function mostrar(data, clase) {
@@ -94,102 +103,81 @@ function mostrar(data, clase) {
   box.className = clase;
 
   box.innerHTML = `
-    <div>${data.titulo || "SIN RESPUESTA"}</div>
-    <div class="detalle">${data.nombre || ""}</div>
-    <div class="detalle">DNI: ${data.dni || ""}</div>
-    <div class="detalle">${data.detalle || ""}</div>
-    <div class="detalle">Ingresados: ${data.totalIngresados ?? ""} / ${data.totalRegistrados ?? ""}</div>
+    <div>${data.titulo}</div>
+    <div class="detalle">${data.nombre}</div>
+    <div class="detalle">DNI: ${data.dni}</div>
   `;
 }
 
-async function validar(valorLeido) {
-  if (!valorLeido || bloqueado) return;
+function jsonp(dni){
+  return new Promise((resolve, reject) => {
+    const cb = "cb_" + (++contador);
+
+    window[cb] = function(data){
+      resolve(data);
+      delete window[cb];
+      script.remove();
+    };
+
+    const script = document.createElement("script");
+    script.src = API + "&dni=" + dni + "&callback=" + cb;
+
+    script.onerror = function(){
+      reject();
+      delete window[cb];
+      script.remove();
+    };
+
+    document.body.appendChild(script);
+  });
+}
+
+async function validar(dni){
+  if(!dni) return;
 
   const ahora = Date.now();
-  if (valorLeido === ultimoCodigo && (ahora - ultimoTiempo) < 2000) {
-    return;
-  }
 
-  ultimoCodigo = valorLeido;
-  ultimoTiempo = ahora;
-
-  const dni = extraerDni(valorLeido);
-
-  if (!dni) {
-    mostrar({
-      titulo: "QR INVÁLIDO",
-      nombre: "",
-      dni: "",
-      detalle: "No se pudo obtener el DNI.",
-      totalIngresados: "",
-      totalRegistrados: ""
-    }, "error");
+  if (bloqueado && dni === ultimoCodigo && (ahora - ultimoTiempo) < 2000){
     return;
   }
 
   bloqueado = true;
+  ultimoCodigo = dni;
+  ultimoTiempo = ahora;
 
-  try {
-    let r = await fetch(API + "&dni=" + encodeURIComponent(dni));
-    let texto = await r.text();
+  debug("Validando: " + dni);
 
-    let d;
-    try {
-      d = JSON.parse(texto);
-    } catch (e) {
-      mostrar({
-        titulo: "ERROR DE RESPUESTA",
-        nombre: "",
-        dni: dni,
-        detalle: "El Apps Script no devolvió JSON válido.",
-        totalIngresados: "",
-        totalRegistrados: ""
-      }, "error");
-      bloqueado = false;
-      return;
-    }
+  try{
+    const d = await jsonp(dni);
 
-    if (d.estado === "ok") mostrar(d, "ok");
-    else if (d.estado === "repetido") mostrar(d, "repetido");
-    else if (d.estado === "no_encontrado") mostrar(d, "no");
-    else {
-      mostrar({
-        titulo: "RESPUESTA DESCONOCIDA",
-        nombre: "",
-        dni: dni,
-        detalle: "El script respondió algo inesperado.",
-        totalIngresados: "",
-        totalRegistrados: ""
-      }, "error");
-    }
+    if(d.estado === "ok") mostrar(d,"ok");
+    else if(d.estado === "repetido") mostrar(d,"repetido");
+    else if(d.estado === "no_encontrado") mostrar(d,"no");
+    else mostrar(d,"error");
 
-  } catch (e) {
-    mostrar({
-      titulo: "ERROR DE CONEXIÓN",
-      nombre: "",
-      dni: dni,
-      detalle: "No se pudo conectar con Apps Script.",
-      totalIngresados: "",
-      totalRegistrados: ""
-    }, "error");
+  }catch(e){
+    mostrar({titulo:"ERROR",nombre:"",dni:""}, "error");
+    debug("Error conexión");
   }
 
-  setTimeout(() => {
-    bloqueado = false;
-  }, 1800);
+  setTimeout(()=>{ bloqueado=false; },1500);
 }
 
-function manual() {
+function manual(){
   let dni = document.getElementById("dni").value.trim();
   validar(dni);
-  document.getElementById("dni").value = "";
+  document.getElementById("dni").value="";
 }
 
-function scanSuccess(text) {
-  validar(text);
+function scanSuccess(text){
+  debug("QR: " + text);
+  validar(text.trim());
 }
 
-new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }).render(scanSuccess);
+new Html5QrcodeScanner("reader", {
+  fps: 8,
+  qrbox: 180
+}).render(scanSuccess);
 </script>
 
 </body>
