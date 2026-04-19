@@ -1,217 +1,194 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Escáner</title>
-<script src="https://unpkg.com/html5-qrcode"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escáner</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
-<style>
-body {
-  font-family: Arial, sans-serif;
-  text-align: center;
-  margin: 0;
-  padding: 10px;
-  background: #f5f5f5;
-}
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 10px;
+      background: #f5f5f5;
+    }
 
-#res {
-  position: sticky;
-  top: 0;
-  z-index: 999;
-  margin: 0 auto 10px;
-  padding: 16px;
-  color: white;
-  font-size: 22px;
-  font-weight: bold;
-  display: none;
-  width: 95%;
-  max-width: 420px;
-  border-radius: 12px;
-  box-sizing: border-box;
-}
+    #res {
+      position: sticky;
+      top: 0;
+      z-index: 999;
+      margin: 0 auto 10px;
+      padding: 16px;
+      color: white;
+      font-size: 22px;
+      font-weight: bold;
+      display: none;
+      width: 95%;
+      max-width: 420px;
+      border-radius: 12px;
+      box-sizing: border-box;
+    }
 
-.ok { background: #188038; }
-.repetido { background: #d93025; }
-.no { background: #f29900; }
-.error { background: #666; }
+    .ok { background: #188038; }
+    .repetido { background: #d93025; }
+    .no { background: #f29900; }
+    .error { background: #666; }
 
-.detalle {
-  font-size: 17px;
-  margin-top: 6px;
-  font-weight: normal;
-  line-height: 1.3;
-}
+    .detalle {
+      font-size: 17px;
+      margin-top: 6px;
+      font-weight: normal;
+      line-height: 1.3;
+    }
 
-#reader {
-  width: 100%;
-  max-width: 260px;
-  margin: 10px auto;
-}
+    #reader {
+      width: 100%;
+      max-width: 260px;
+      margin: 10px auto;
+    }
 
-.fila {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 12px;
-}
+    .fila {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
 
-input {
-  width: 65%;
-  max-width: 220px;
-  font-size: 20px;
-  padding: 10px;
-  box-sizing: border-box;
-}
+    input {
+      width: 65%;
+      max-width: 220px;
+      font-size: 20px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
 
-button {
-  font-size: 20px;
-  padding: 10px 14px;
-}
+    button {
+      font-size: 20px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
 
-#debug {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #444;
-  background: #fff;
-  padding: 8px;
-  border-radius: 8px;
-  max-width: 420px;
-  margin-left: auto;
-  margin-right: auto;
-  word-break: break-word;
-  box-sizing: border-box;
-}
-</style>
+    #debug {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #444;
+      background: #fff;
+      padding: 8px;
+      border-radius: 8px;
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+      word-break: break-word;
+      box-sizing: border-box;
+    }
+  </style>
 </head>
 
 <body>
 
-<div id="res"></div>
+  <div id="res"></div>
 
-<div id="reader"></div>
+  <div id="reader"></div>
 
-<div id="debug">Esperando QR...</div>
+  <div id="debug">Esperando QR...</div>
 
-<div class="fila">
-  <input id="dni" placeholder="DNI">
-  <button onclick="manual()">OK</button>
-</div>
+  <div class="fila">
+    <input id="dni" placeholder="DNI">
+    <button onclick="manual()">OK</button>
+  </div>
 
-<script>
-const API = "https://script.google.com/macros/s/AKfycby4Cqm2beoseskyYse9qWd2mRRCe0RfjvpnSlpXiksqqmqZfBAXS76k_Y9orI6eCrCsbA/exec?formato=json";
-let bloqueado = false;
-let ultimoCodigo = "";
-let ultimoTiempo = 0;
-let contador = 0;
+  <script>
+    const API = "https://script.google.com/macros/s/AKfycby4Cqm2beoseskyYse9qWd2mRRCe0RfjvpnSlpXiksqqmqZfBAXS76k_Y9orI6eCrCsbA/exec?formato=json";
 
-function debug(txt) {
-  document.getElementById("debug").textContent = txt;
-}
+    let bloqueado = false;
+    let ultimoCodigo = "";
+    let ultimoTiempo = 0;
 
-function mostrar(data, clase) {
-  let box = document.getElementById("res");
-  box.style.display = "block";
-  box.className = clase;
+    function debug(txt) {
+      document.getElementById("debug").textContent = txt;
+    }
 
-  box.innerHTML = `
-    <div>${data.titulo || "SIN RESPUESTA"}</div>
-    <div class="detalle">${data.nombre || ""}</div>
-    <div class="detalle">DNI: ${data.dni || ""}</div>
-    <div class="detalle">${data.detalle || ""}</div>
-    <div class="detalle">Ingresados: ${data.totalIngresados ?? ""} / ${data.totalRegistrados ?? ""}</div>
-  `;
-}
+    function mostrar(data, clase) {
+      let box = document.getElementById("res");
+      box.style.display = "block";
+      box.className = clase;
 
-function jsonp(dni) {
-  return new Promise((resolve, reject) => {
-    const cb = "cb_" + (++contador);
+      box.innerHTML = `
+        <div>${data.titulo || "SIN RESPUESTA"}</div>
+        <div class="detalle">${data.nombre || ""}</div>
+        <div class="detalle">DNI: ${data.dni || ""}</div>
+        <div class="detalle">${data.detalle || ""}</div>
+        <div class="detalle">Ingresados: ${data.totalIngresados ?? ""} / ${data.totalRegistrados ?? ""}</div>
+      `;
+    }
 
-    window[cb] = function(data) {
-      resolve(data);
-      delete window[cb];
-      if (script.parentNode) script.parentNode.removeChild(script);
-    };
+    async function validar(dni) {
+      if (!dni) return;
 
-    const script = document.createElement("script");
-    script.src = API + "&dni=" + encodeURIComponent(dni) + "&callback=" + cb;
+      const ahora = Date.now();
 
-    script.onerror = function() {
-      reject(new Error("No se pudo cargar el script"));
-      delete window[cb];
-      if (script.parentNode) script.parentNode.removeChild(script);
-    };
-
-    document.body.appendChild(script);
-
-    setTimeout(() => {
-      if (window[cb]) {
-        delete window[cb];
-        if (script.parentNode) script.parentNode.removeChild(script);
-        reject(new Error("Timeout"));
+      if (bloqueado && dni === ultimoCodigo && (ahora - ultimoTiempo) < 2000) {
+        debug("Código repetido ignorado: " + dni);
+        return;
       }
-    }, 8000);
-  });
-}
 
-async function validar(dni) {
-  if (!dni) return;
+      bloqueado = true;
+      ultimoCodigo = dni;
+      ultimoTiempo = ahora;
 
-  const ahora = Date.now();
+      debug("Validando: " + dni);
 
-  if (bloqueado && dni === ultimoCodigo && (ahora - ultimoTiempo) < 2000) {
-    debug("Código repetido ignorado: " + dni);
-    return;
-  }
+      try {
+        const r = await fetch(API + "&dni=" + encodeURIComponent(dni));
+        const d = await r.json();
 
-  bloqueado = true;
-  ultimoCodigo = dni;
-  ultimoTiempo = ahora;
+        if (d.estado === "ok") mostrar(d, "ok");
+        else if (d.estado === "repetido") mostrar(d, "repetido");
+        else if (d.estado === "no_encontrado") mostrar(d, "no");
+        else mostrar(d, "error");
 
-  debug("Validando: " + dni);
+      } catch (e) {
+        mostrar({
+          titulo: "ERROR DE CONEXIÓN",
+          nombre: "",
+          dni: dni,
+          detalle: "No respondió el script",
+          totalIngresados: "",
+          totalRegistrados: ""
+        }, "error");
 
-  try {
-    const d = await jsonp(dni);
+        debug("Error conexión con DNI: " + dni);
+      }
 
-    if (d.estado === "ok") mostrar(d, "ok");
-    else if (d.estado === "repetido") mostrar(d, "repetido");
-    else if (d.estado === "no_encontrado") mostrar(d, "no");
-    else mostrar(d, "error");
+      setTimeout(() => {
+        bloqueado = false;
+      }, 1500);
+    }
 
-  } catch (e) {
-    mostrar({
-      titulo: "ERROR DE CONEXIÓN",
-      nombre: "",
-      dni: dni,
-      detalle: "No respondió el script",
-      totalIngresados: "",
-      totalRegistrados: ""
-    }, "error");
-    debug("Error conexión con DNI: " + dni);
-  }
+    function manual() {
+      let dni = document.getElementById("dni").value.trim();
+      if (!dni) return;
+      debug("Ingreso manual: " + dni);
+      validar(dni);
+      document.getElementById("dni").value = "";
+    }
 
-  setTimeout(() => {
-    bloqueado = false;
-  }, 1500);
-}
+    function scanSuccess(text) {
+      debug("QR: " + text);
+      validar(text.trim());
+    }
 
-function manual() {
-  let dni = document.getElementById("dni").value.trim();
-  if (!dni) return;
-  debug("Ingreso manual: " + dni);
-  validar(dni);
-  document.getElementById("dni").value = "";
-}
-
-function scanSuccess(text) {
-  debug("QR: " + text);
-  validar(text.trim());
-}
-
-new Html5QrcodeScanner("reader", {
-  fps: 8,
-  qrbox: 180
-}).render(scanSuccess);
-</script>
+    new Html5QrcodeScanner(
+      "reader",
+      {
+        fps: 8,
+        qrbox: 180
+      },
+      false
+    ).render(scanSuccess);
+  </script>
 
 </body>
 </html>
