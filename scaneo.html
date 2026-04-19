@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escáner</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body { font-family: Arial; text-align: center; margin: 0; padding: 10px; }
+#reader { width: 100%; max-width: 400px; margin: auto; }
+input { width: 70%; font-size: 20px; padding: 10px; }
+button { font-size: 20px; padding: 10px; }
+#res {
+  margin-top: 10px;
+  padding: 20px;
+  color: white;
+  font-size: 22px;
+  display: none;
+}
+.ok { background: green; }
+.repetido { background: red; }
+.no { background: orange; }
+</style>
+</head>
+
+<body>
+
+<div id="reader"></div>
+
+<br>
+
+<input id="dni" placeholder="DNI">
+<button onclick="manual()">OK</button>
+
+<div id="res"></div>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbzEnODMs4xwkCmpLQUlga86M-DieCcAOrriSsHHWGQ2hQKCN904gIYmFINGtBiiZo9F9g/exec?formato=json";
+
+let bloqueado = false;
+
+async function validar(dni){
+  if(!dni || bloqueado) return;
+  bloqueado = true;
+
+  let r = await fetch(API + "&dni=" + dni);
+  let d = await r.json();
+
+  let box = document.getElementById("res");
+  box.style.display = "block";
+
+  if(d.estado=="ok") box.className="ok";
+  else if(d.estado=="repetido") box.className="repetido";
+  else box.className="no";
+
+  box.innerHTML = d.titulo + "<br>" + d.nombre;
+
+  setTimeout(()=>{ bloqueado=false; },1500);
+}
+
+function manual(){
+  let dni = document.getElementById("dni").value;
+  validar(dni);
+  document.getElementById("dni").value="";
+}
+
+function scanSuccess(text){
+  validar(text);
+}
+
+new Html5QrcodeScanner("reader", { fps:10, qrbox:250 }).render(scanSuccess);
+</script>
+
+</body>
+</html>
