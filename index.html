@@ -21,13 +21,14 @@
       margin: 0 auto 10px;
       padding: 14px;
       color: white;
-      font-size: 24px;
+      font-size: 26px;
       font-weight: bold;
       display: none;
       width: 95%;
       max-width: 420px;
       border-radius: 12px;
       box-sizing: border-box;
+      min-height: 92px;
     }
 
     .ok { background: #188038; }
@@ -44,7 +45,7 @@
 
     #reader {
       width: 100%;
-      max-width: 240px;
+      max-width: 230px;
       margin: 8px auto;
     }
 
@@ -65,15 +66,25 @@
     }
 
     button {
-      font-size: 20px;
+      font-size: 18px;
       padding: 10px 14px;
       cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      background: #222;
+      color: white;
     }
 
     #debug {
       margin-top: 6px;
       font-size: 12px;
       color: #666;
+    }
+
+    #estadoAudio {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #444;
     }
   </style>
 </head>
@@ -85,6 +96,7 @@
   <div id="reader"></div>
 
   <div id="debug">Esperando QR...</div>
+  <div id="estadoAudio">Toca una vez la pantalla para activar sonido.</div>
 
   <div class="fila">
     <input id="dni" placeholder="DNI">
@@ -97,11 +109,18 @@
     let bloqueado = false;
     let ultimoCodigo = "";
     let ultimoTiempo = 0;
-    const TIEMPO_BLOQUEO = 2200;
-    const TIEMPO_MISMO_QR = 4000;
+
+    const TIEMPO_BLOQUEO = 1200;     // rápido
+    const TIEMPO_MISMO_QR = 3000;    // evita repeticiones del mismo
+    let audioCtx = null;
+    let audioActivo = false;
 
     function debug(txt) {
       document.getElementById("debug").textContent = txt;
+    }
+
+    function estadoAudio(txt) {
+      document.getElementById("estadoAudio").textContent = txt;
     }
 
     function mostrar(data, clase) {
@@ -122,15 +141,85 @@
       box.innerHTML = "";
     }
 
+    function activarAudio() {
+      if (audioActivo) return;
+
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          estadoAudio("Este navegador no soporta audio web.");
+          return;
+        }
+
+        audioCtx = new AudioContextClass();
+
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+
+        audioActivo = true;
+        estadoAudio("Sonido activado.");
+      } catch (e) {
+        estadoAudio("No se pudo activar sonido.");
+      }
+    }
+
+    function beep(freq, duration, volume, type, delayMs) {
+      if (!audioActivo || !audioCtx) return;
+
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = type || "sine";
+        osc.frequency.value = freq;
+        gain.gain.value = volume || 0.15;
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const startAt = audioCtx.currentTime + ((delayMs || 0) / 1000);
+        const endAt = startAt + (duration / 1000);
+
+        osc.start(startAt);
+        osc.stop(endAt);
+      } catch (e) {}
+    }
+
+    function sonidoOk() {
+      beep(980, 70, 0.18, "square", 0);
+      beep(1280, 90, 0.18, "square", 90);
+    }
+
+    function sonidoRepetido() {
+      beep(280, 120, 0.22, "sawtooth", 0);
+      beep(220, 180, 0.22, "sawtooth", 130);
+    }
+
+    function sonidoNoEncontrado() {
+      beep(520, 100, 0.18, "triangle", 0);
+      beep(520, 100, 0.18, "triangle", 140);
+    }
+
+    function vibrarOk() {
+      if (navigator.vibrate) navigator.vibrate([60, 30, 80]);
+    }
+
+    function vibrarRepetido() {
+      if (navigator.vibrate) navigator.vibrate([180, 70, 180]);
+    }
+
+    function vibrarNoEncontrado() {
+      if (navigator.vibrate) navigator.vibrate([100, 40, 100]);
+    }
+
     async function validar(dni) {
       if (!dni) return;
 
       dni = dni.trim();
       const ahora = Date.now();
 
-      if (bloqueado) {
-        return;
-      }
+      if (bloqueado) return;
 
       if (dni === ultimoCodigo && (ahora - ultimoTiempo) < TIEMPO_MISMO_QR) {
         debug("Mismo QR ignorado");
@@ -151,10 +240,21 @@
 
         const d = await r.json();
 
-        if (d.estado === "ok") mostrar(d, "ok");
-        else if (d.estado === "repetido") mostrar(d, "repetido");
-        else if (d.estado === "no_encontrado") mostrar(d, "no");
-        else mostrar({ titulo: "ERROR", nombre: "", dni: dni }, "error");
+        if (d.estado === "ok") {
+          mostrar(d, "ok");
+          sonidoOk();
+          vibrarOk();
+        } else if (d.estado === "repetido") {
+          mostrar(d, "repetido");
+          sonidoRepetido();
+          vibrarRepetido();
+        } else if (d.estado === "no_encontrado") {
+          mostrar(d, "no");
+          sonidoNoEncontrado();
+          vibrarNoEncontrado();
+        } else {
+          mostrar({ titulo: "ERROR", nombre: "", dni: dni }, "error");
+        }
 
         debug("Listo");
 
@@ -165,6 +265,8 @@
           dni: dni
         }, "error");
 
+        sonidoRepetido();
+        vibrarRepetido();
         debug("Error conexión");
       }
 
@@ -178,6 +280,7 @@
     function manual() {
       let dni = document.getElementById("dni").value.trim();
       if (!dni) return;
+      activarAudio();
       validar(dni);
       document.getElementById("dni").value = "";
     }
@@ -186,11 +289,14 @@
       validar(text.trim());
     }
 
+    document.body.addEventListener("click", activarAudio, { once: true });
+    document.body.addEventListener("touchstart", activarAudio, { once: true });
+
     new Html5QrcodeScanner(
       "reader",
       {
-        fps: 6,
-        qrbox: 170,
+        fps: 7,
+        qrbox: 160,
         rememberLastUsedCamera: true
       },
       false
